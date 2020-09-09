@@ -1,8 +1,8 @@
 #https://www.bc-robotics.com/tutorials/sending-email-attached-photo-using-python-raspberry-pi/
 from gpiozero import MotionSensor, CPUTemperature
 from picamera import PiCamera, Color
-import time, datetime, signal, sys, os, smtplib, ssl, httplib, subprocess, re
-
+import time, datetime, signal, sys, os, smtplib, ssl, httplib, subprocess, re, pdb
+ 
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.image import MIMEImage
@@ -11,20 +11,42 @@ SMTP_SERVER = 'smtp.gmail.com'
 SMTP_PORT = 587 
 GMAIL_USERNAME = '' #holds email used to send emails and upload to google drive
 GMAIL_PASSWORD = '' #holds corresponding password
-MODE = ''
+MODE = None
 NOTIFY = '' #indicate wish to send email notification
 EMAIL = '' #email to deliver to 
 UPLOAD = '' #indicates desire to uplaod content to google drive
 
 count = 0
-start = 0
-start_time = ''
-etho = False
+timer_start = 0
+start_time_and_date = ''
+ethernet = False
 modes = ['log', 'pic', 'vid']
+
+#for storing user preference configuration while running
+class configPrefs:
+    def __init__(self, user = None, pswrd = None, mode = None, notify = None, email = None, upload = None):
+        self.user = user
+        self.pswrd = pswrd
+        self.mode = mode
+        self.notify = notify
+        self.email = email
+        self.upload = upload
+        
+
+#takes the 'Modes' line from .config and returns a list of the modes
+def extractModes(str):
+    list = re.findall('\w*' ,str)
+    list2 = []
+    del list[0]
+    for e in list:
+        if e is not '':
+            list2.append(e)
+    print list2
+    return list2
 
 #reads in preferences for running this program, such as
 #taking video/pictures/log file, or notification preferences
-def readConfig():
+def readConfiguration():
     global GMAIL_USERNAME
     global GMAIL_PASSWORD
     global EMAIL
@@ -37,17 +59,19 @@ def readConfig():
     GMAIL_USERNAME = match.group(1)
     match = re.search('Password: (.*)' ,fd.readline())
     GMAIL_PASSWORD = match.group(1)
-    MODE = re.findAll('\w*' ,fd.readline())
-    print match.group(1)
-    print match.group(2)
+    MODE = extractModes(fd.readline())
+
     match = re.search('Notifications: (.*)' ,fd.readline())
     NOTIFY = match.group(1)
     match = re.search('Recieving: (.*)' ,fd.readline())
     EMAIL = match.group(1)
     match = re.search('Upload: (.*)' ,fd.readline())
     UPLOAD = match.group(1)
+
+    return configPrefs(GMAIL_USERNAME, GMAIL_PASSWORD, EMAIL, MODE, NOTIFY, UPLOAD)
     
-def printConfig():
+#for testing purposes
+def printConfiguration():
     global GMAIL_USERNAME
     global GMAIL_PASSWORD
     global EMAIL
@@ -64,7 +88,7 @@ notifications: {}
 uplaod pref: {}
 """.format(GMAIL_USERNAME, GMAIL_PASSWORD, EMAIL, MODE, NOTIFY, UPLOAD)
     
-def config():
+def configure():
     if os.path.isfile('/home/pi/Documents/talos/.config'):
         while True:
             confirm = raw_input('.config file already exists. Would you like to overwrite it?\n yes/no: \n')
@@ -89,6 +113,10 @@ def config():
                 break
             elif user == 'guest' or user == '':
                 user = 'guest'
+                pswd = 'n/a'
+                notify = 'no'
+                rec = 'n/a'
+                upload = 'no'
                 break
             print 'Invalid email address'
     if user is not 'guest':
@@ -144,8 +172,9 @@ def getModes():
     for mode in modes:
         str = str + mode + ' '
     return str
-        
-def clear_config():
+
+#deletes .config file
+def clear_configuration():
     while True:
             confirm = raw_input('Are you sure you want to delete your configuration? [yes/no]\n')
             if confirm.lower()  == 'no':
@@ -213,7 +242,7 @@ class Emailer:
 sender = Emailer()
     
 def send_email(f):
-    if not etho:
+    if not ethernet:
         os.system('ifconfig wlan0 up')
         print 'Connecting to internet'
     sendTo = 'gdeubner@gmail.com'
@@ -226,11 +255,11 @@ def send_email(f):
     if t2-t1 >= 120:
         print 'Connection failed, email not sent'
         return
-    if not etho:
+    if not ethernet:
         print 'Connected'
     sender.sendmail(sendTo, emailSubject, emailContent, f)
     print 'Email sent'
-    if not etho:
+    if not ethernet:
         os.system('ifconfig wlan0 down')
         print 'Disconnected'
 
@@ -244,7 +273,7 @@ Duration: {}
 Detections: {}
 Space on device: {}, Space used: {}, Space free: {}
 CPU Temperature: {}C, (recomended temp: -40C to 85C)
-    """.format(start_time, str, str_now(), timer(start, time.time()), count, spc[1], spc[2], spc[3], cpu.temperature)
+    """.format(start_time_and_date, str, str_now(), timer(timer_start, time.time()), count, spc[1], spc[2], spc[3], cpu.temperature)
     return str
 
     
@@ -259,7 +288,7 @@ def timer(start, finish):
 def sighandl(signum, frame):
     print '\nmonitoring stopped'
     print summary('End')
-    new_entry('End    ','')
+    new_log_entry('End    ','')
     sys.exit()
         
 def to_str(num, l):
@@ -275,11 +304,11 @@ def str_now():
     d = datetime.datetime.now()
     return ''.join((to_str(d.month,2),'-',to_str(d.day,2),'-',str(d.year),'|',to_str(d.hour,2),':',to_str(d.minute,2),':',to_str(d.second,2)))
     
-def new_entry(action, mode):
+def new_log_entry(action, mode):
     '''
     creates a new date/time/action entry in the logfile
     '''
-    fd = open('/home/pi/Documents/talos/logfile', 'a+')
+    fd = open('/home/pi/Documents/talos/logfile.txt', 'a+')
     d = datetime.datetime.now()
     fd.write(''.join((to_str(d.month,2),'/',to_str(d.day,2),'/',str(d.year),'\t',to_str(d.hour,2),':',to_str(d.minute,2),':',to_str(d.second,2), '\t', action, '\t\t', mode,'\n')))
     fd.close()
@@ -352,39 +381,49 @@ def instruc():
     vid mode: Talos will take a video when motion sensor is tripped
     as well as keeping a log file.
     """
-    
+
+def modeToStr(mode):
+    mode_str = ''
+    for m in mode:
+        mode_str = mode_str + m
+    return mode_str
+
+#runs monitoring software based on configurations saved in .config file
 def monitor():
     global count
-    global start
-    global start_time
+    global timer_start
+    global start_time_and_date
     global MODE
+
+    #pdb.set_trace()
     
     #time.sleep(60)
-    signal.signal(signal.SIGINT, sighandl) 
-    #signal.signal(signal.SIGTSTP, sighandl)
-    start = time.time()
-    start_time = str_now()
-    fd = open('/home/pi/Documents/talos/logfile', 'a+')
-    fd.seek(0)
-    if not fd.read(1):
-        fd.write('Date:\t\tTime:\t\tAction:\t\tMode:\n')
-    fd.close()
+    signal.signal(signal.SIGINT, sighandl)
+    timer_start = time.time()
+    start_time_and_date = str_now()
+    if 'log' in MODE:
+        fd = open('/home/pi/Documents/talos/logfile.txt', 'a+')
+        fd.seek(0)
+        if not fd.read(1):
+            fd.write('Date:\t\tTime:\t\tAction:\t\tMode:\n')
+        fd.close()
     pir = MotionSensor(4,queue_len = 1)
-    new_entry('Start ','')
+    if 'log' in MODE:
+        new_log_entry('Start ','')
     print 'monitoring'
     cam = PiCamera()
-    os.system('ifconfig wlan0 down')
-    global etho
-    etho = connected()
+    os.system('ifconfig wlan0 down') #turns off wifi card to conserve energy
+    global ethernet
+    ethernet = connected()
     while True:
-        while not pir.motion_detected:
+        while not pir.motion_detected: #just loops until motion is detected
             x=1
         print 'Motion detected'
         count += 1
         img = None
         vid = None
         if 'log' in MODE:
-            new_entry('Motion', MODE)
+            new_log_entry('Motion', modeToStr(MODE))
         if 'pic' in MODE:
             img = take_pic(cam)
         if 'vid' in MODE:
@@ -394,24 +433,6 @@ def monitor():
         #if UPLOAD is 'yes':
         #    upload(img, vid_list)
 
-#####################################
-        
-        if 'pic' in MODE:
-            img = take_pic(cam)
-            if NOTIFY is 'yes':
-                send_email(img)
-        elif mode == 'vid':
-            if email:
-                img = take_pic(cam)
-                take_vid(cam, pir)
-                send_email(img)
-            else:
-                take_vid(cam, pir)
-        else:
-            if email:
-                img = take_pic(cam)
-                send_email(img)
-        new_entry('Motion', mode)
         pir.wait_for_no_motion()    
 
 def noConfigFile():
@@ -421,27 +442,25 @@ def noConfigFile():
     
 def main():
     global modes
-
-
+    unrecognized_input = 'Unrecognized input. Enter "python talos.py instructions" for help.'
+    
     if len(sys.argv) is 1:
         if os.path.isfile('/home/pi/Documents/talos/.config'):
-            readConfig()
-            printConfig()
-            return
+            configPrefs = readConfiguration()
             monitor()
         else:
             noConfigFile()
     elif len(sys.argv) is 2:
         if sys.argv[1] == 'config':
-            config()
+            configure()
         elif sys.argv[1] == 'clear_config':
-            clear_config()
+            clear_configuration()
         elif sys.argv[1] == 'instructions':
             instruc()
         else:
-            'Unrecognized input. enter "python talos.py instructions" for help'
+            print unrecognized_input
     else:
-        print 'Unrecognized input. enter "python talos.py instructions" for help'
+        print unrecognized_input
 
 
     return
