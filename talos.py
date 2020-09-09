@@ -22,8 +22,9 @@ start_time_and_date = ''
 ethernet = False
 modes = ['log', 'pic', 'vid']
 
-#for storing user preference configuration while running
+
 class configPrefs:
+    '''for storing user preference configuration while running'''
     def __init__(self, user = None, pswrd = None, mode = None, notify = None, email = None, upload = None):
         self.user = user
         self.pswrd = pswrd
@@ -32,9 +33,8 @@ class configPrefs:
         self.email = email
         self.upload = upload
         
-
-#takes the 'Modes' line from .config and returns a list of the modes
 def extractModes(str):
+    '''takes the 'Modes' line from .config and returns a list of the modes'''
     list = re.findall('\w*' ,str)
     list2 = []
     del list[0]
@@ -44,9 +44,8 @@ def extractModes(str):
     print list2
     return list2
 
-#reads in preferences for running this program, such as
-#taking video/pictures/log file, or notification preferences
 def readConfiguration():
+    '''reads in preferences for running this program, such as taking video/pictures/log file, or notification preferences'''
     global GMAIL_USERNAME
     global GMAIL_PASSWORD
     global EMAIL
@@ -70,8 +69,8 @@ def readConfiguration():
 
     return configPrefs(GMAIL_USERNAME, GMAIL_PASSWORD, EMAIL, MODE, NOTIFY, UPLOAD)
     
-#for testing purposes
 def printConfiguration():
+    '''Prints credentials read from .config. Used for testing'''
     global GMAIL_USERNAME
     global GMAIL_PASSWORD
     global EMAIL
@@ -89,6 +88,7 @@ uplaod pref: {}
 """.format(GMAIL_USERNAME, GMAIL_PASSWORD, EMAIL, MODE, NOTIFY, UPLOAD)
     
 def configure():
+    '''Reads in user's preferences for how Talos should run when monitoring. prefs saved in .config'''
     if os.path.isfile('/home/pi/Documents/talos/.config'):
         while True:
             confirm = raw_input('.config file already exists. Would you like to overwrite it?\n yes/no: \n')
@@ -168,13 +168,15 @@ def configure():
     fd.close()
 
 def getModes():
+    '''returns modes saved in .config as a string'''
     str = ''
     for mode in modes:
         str = str + mode + ' '
     return str
 
-#deletes .config file
+
 def clear_configuration():
+    '''deletes .config file'''
     while True:
             confirm = raw_input('Are you sure you want to delete your configuration? [yes/no]\n')
             if confirm.lower()  == 'no':
@@ -191,6 +193,7 @@ def clear_configuration():
         print 'No .config file found'
 
 def get_space():
+    '''returns a tuple with current information about the system like space used, unused, ect.'''
     df = subprocess.Popen(["df", '-h', "/"], stdout=subprocess.PIPE)
     output = df.communicate()[0]
     device, size, used, available, percent, mountpoint = \
@@ -199,6 +202,7 @@ def get_space():
     
     
 def connected():
+    '''determines if system is connected to the internet by contacting www.google.com'''
     conn = httplib.HTTPConnection("www.google.com", timeout=5)
     try:
         conn.request("HEAD", "/")
@@ -210,6 +214,7 @@ def connected():
 
 
 class Emailer:
+    '''class used for sending an email notification'''
     def sendmail(self, recipient, subject, content, image):
           
         #Create Headers
@@ -242,6 +247,7 @@ class Emailer:
 sender = Emailer()
     
 def send_email(f):
+    '''sends email to predetermined email address'''
     if not ethernet:
         os.system('ifconfig wlan0 up')
         print 'Connecting to internet'
@@ -264,6 +270,7 @@ def send_email(f):
         print 'Disconnected'
 
 def summary(str):
+    '''prints a summary of system to console. (temp, memory, # of detections)'''
     cpu = CPUTemperature()
     spc = get_space()
     str ="""----SUMMARY----
@@ -278,6 +285,7 @@ CPU Temperature: {}C, (recomended temp: -40C to 85C)
 
     
 def timer(start, finish):
+    '''given start and end times in seconds, returns a string of total hours, minutes, and seconds elapsed'''
     t = finish - start
     hours = int(t/3600)
     minutes = int((t%3600)/60)
@@ -286,15 +294,15 @@ def timer(start, finish):
     
 
 def sighandl(signum, frame):
+    '''handles sigsegfault'''
     print '\nmonitoring stopped'
     print summary('End')
     new_log_entry('End    ','')
     sys.exit()
-        
+
+
 def to_str(num, l):
-    '''
-    prepends '0' to num until it's length l
-    '''
+    '''prepends '0' to num until it creates a string of length l'''
     s = str(num)
     while len(s)<l:
         s = '0'+s
@@ -305,17 +313,16 @@ def str_now():
     return ''.join((to_str(d.month,2),'-',to_str(d.day,2),'-',str(d.year),'|',to_str(d.hour,2),':',to_str(d.minute,2),':',to_str(d.second,2)))
     
 def new_log_entry(action, mode):
-    '''
-    creates a new date/time/action entry in the logfile
-    '''
+    '''creates a new date/time/action entry in the logfile'''
     fd = open('/home/pi/Documents/talos/logfile.txt', 'a+')
     d = datetime.datetime.now()
     fd.write(''.join((to_str(d.month,2),'/',to_str(d.day,2),'/',str(d.year),'\t',to_str(d.hour,2),':',to_str(d.minute,2),':',to_str(d.second,2), '\t', action, '\t\t', mode,'\n')))
     fd.close()
 
 
-#take multiple pictres while movement, every 5 seconds 
+
 def take_pic(cam):
+    '''takes a picture and saves it'''
     if not os.path.isdir('/home/pi/Documents/talos/pics-talos'):
         os.makedirs('/home/pi/Documents/talos/pics-talos')
     cam.rotation = 0
@@ -330,6 +337,7 @@ def take_pic(cam):
     return image
 
 def take_vid(cam, pir):
+    '''takes a video while movement is detected'''
     duration = 10
     if not os.path.isdir('/home/pi/Documents/talos/vids-talos'):
         os.makedirs('/home/pi/Documents/talos/vids-talos')
@@ -362,6 +370,7 @@ def take_vid(cam, pir):
     return vid_list
 
 def instruc():
+    '''prints instructions to console'''
     print """TALOS - your very own sentry 
     Modes:
     [sudo] python talos.py [config/log/pic/vid] [email]
@@ -383,13 +392,15 @@ def instruc():
     """
 
 def modeToStr(mode):
+    '''returns a string containing the modes in .config'''
     mode_str = ''
     for m in mode:
         mode_str = mode_str + m
     return mode_str
 
-#runs monitoring software based on configurations saved in .config file
+
 def monitor():
+    '''runs monitoring software based on configurations saved in .config file'''
     global count
     global timer_start
     global start_time_and_date
@@ -436,8 +447,9 @@ def monitor():
         pir.wait_for_no_motion()    
 
 def noConfigFile():
-    print 'Welcome to Talos, your personal sentinel./nNo config file was found./nEntering configuration mode.'
-    config()
+    '''prints a welcome and error message, then calls configure method'''
+    print 'Welcome to Talos, your personal sentinel.\nNo config file was found.\nEntering configuration mode.'
+    configure()
 
     
 def main():
