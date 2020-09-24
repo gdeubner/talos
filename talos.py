@@ -372,23 +372,37 @@ def take_vid(cam, pir):
 def instruc():
     '''prints instructions to console'''
     print """TALOS - your very own sentry 
-    Modes:
-    [sudo] python talos.py [config/log/pic/vid] [email]
+    To run:
+    [sudo] python talos.py (optional:[-config, -clear_config, -instructions])
+
+    Running the command "sudo python talos.py" will have Talos read in the user
+    preferences from the .congfig file and begin monitoring based on those 
+    preferences.
+
+    config tag: program will prompt the user for information about how the 
+    program should run. This information is saved in a .config file. The 
+    following will be asked:
     
-    config mode: Creates a .config file which stores the emails and 
-    passwords used to send notifications when camera is activated.
-    (Must run as sudo to send email notifications)
+    * User email address - used to send email notifications when the motion sensor
+      is tripped. Enter guest to skip this option. 
+      (Note: Must have "Less Secure Apps" enabled)
+
+    * Password - the corresponding user email password
     
-    clear_config mode: Talos will delete your .config file
+    * Notifications - entering yes will allow Talos to send you email notifications
+      when th motion sensor is tripped with a picture of what tripped it (if 
+      pictures are enabled) along with basic information about the computer running 
+      the program like storage space and cpu temperature.
 
-    log mode: Talos will keep a log file of each time the motion
-    sensor is tripped.
+    * Email Notified - the email Talos will send your notifications to.
 
-    pic mode: Talos will take a picture when motion sensor is 
-    tripped as well as keeping a log file.
+    * Upload to drive - This option is currently under construction.
 
-    vid mode: Talos will take a video when motion sensor is tripped
-    as well as keeping a log file.
+    * Modes - you may enter any combination of the modes: log, vid, pic to
+      specify what you would like Talos to do when motion is detected.
+    
+    clear_config tag: Talos will promt you to make sure you want to delete your
+    .config file, then delete the file.
     """
 
 def modeToStr(mode):
@@ -456,7 +470,7 @@ def noConfigFile():
     
 def main():
     global modes
-    unrecognized_input = 'Unrecognized input. Enter "python talos.py instructions" for help.'
+    unrecognized_input = 'Unrecognized input. Enter "python talos.py -instructions" for help.'
     
     if len(sys.argv) is 1:
         if os.path.isfile('/home/pi/Documents/talos/.config'):
@@ -465,11 +479,11 @@ def main():
         else:
             noConfigFile()
     elif len(sys.argv) is 2:
-        if sys.argv[1] == 'config':
+        if sys.argv[1] == '-config':
             configure()
-        elif sys.argv[1] == 'clear_config':
+        elif sys.argv[1] == '-clear_config':
             clear_configuration()
-        elif sys.argv[1] == 'instructions':
+        elif sys.argv[1] == '-instructions':
             instruc()
         else:
             print unrecognized_input
