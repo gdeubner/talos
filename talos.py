@@ -23,7 +23,7 @@ ethernet = False
 modes = ['log', 'pic', 'vid']
 
 
-class configPrefs:
+class configurationPreferences:
     '''for storing user preference configuration while running'''
     def __init__(self, user = None, pswrd = None, mode = None, notify = None, email = None, upload = None):
         self.user = user
@@ -67,7 +67,7 @@ def readConfiguration():
     match = re.search('Upload: (.*)' ,fd.readline())
     UPLOAD = match.group(1)
 
-    return configPrefs(GMAIL_USERNAME, GMAIL_PASSWORD, EMAIL, MODE, NOTIFY, UPLOAD)
+    return configurationPreferences(GMAIL_USERNAME, GMAIL_PASSWORD, EMAIL, MODE, NOTIFY, UPLOAD)
     
 def printConfiguration():
     '''Prints credentials read from .config. Used for testing'''
@@ -395,6 +395,8 @@ def modeToStr(mode):
     '''returns a string containing the modes in .config'''
     mode_str = ''
     for m in mode:
+        if mode_str != '':
+            mode_str = mode_str + '/'
         mode_str = mode_str + m
     return mode_str
 
@@ -439,7 +441,7 @@ def monitor():
             img = take_pic(cam)
         if 'vid' in MODE:
             vid_list = take_vid(cam, pir)
-        if NOTIFY is 'yes':
+        if NOTIFY == 'yes':
             send_email(img)
         #if UPLOAD is 'yes':
         #    upload(img, vid_list)
